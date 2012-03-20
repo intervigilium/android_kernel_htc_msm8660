@@ -1138,7 +1138,6 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 		MIPI_OUTP(MIPI_DSI_BASE + 0x010c, isr);
 		PR_DISP_ERR("%s timeout, isr=0x%08x\n", __func__, isr);
 		mipi_dsi_read_status_reg();
-		mipi_dsi_sw_reset();
 		atomic_set(&need_soft_reset, 1);
 	}
 
@@ -1284,8 +1283,6 @@ void mipi_dsi_read_status_reg(void)
 		{"DSI_DLN0_PHY_ERR", 	0xb0, ~0x0},
 		{"DSI_FIFO_STATUS", 	0x08, ~0x0},
 		{"DSI_STATUS", 		0x04, ~0x0},
-		{"DSI_LANE_STATUS",	0xa4, ~0x0},
-		{"DSI_CLK_STATUS",	0x011c, ~0x0},
 #endif
 	};
 

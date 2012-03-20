@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -154,7 +154,7 @@ static int __devinit vidc_720p_probe(struct platform_device *pdev)
 	}
 
 	/* HTC_START (klockwork issue)*/
-	if (resource && resource->start)
+	if (resource->start)
 		vidc_device_p->phys_base = resource->start;
 	/* HTC_END */
 	vidc_device_p->virt_base = ioremap(resource->start,
@@ -382,7 +382,7 @@ u32 vidc_lookup_addr_table(struct video_client_ctx *client_ctx,
 
 	if (!client_ctx)
 		return false;
-	mutex_lock(&client_ctx->enrty_queue_lock);
+
 	if (buffer == BUFFER_TYPE_INPUT) {
 		buf_addr_table = client_ctx->input_buf_addr_table;
 		num_of_buffers = client_ctx->num_of_input_buffers;
@@ -432,7 +432,6 @@ u32 vidc_lookup_addr_table(struct video_client_ctx *client_ctx,
 			" pmem_fd = %d, struct *file	= %p "
 			"buffer_index = %d\n", *user_vaddr, *phy_addr,
 			*pmem_fd, *file, *buffer_index);
-		mutex_unlock(&client_ctx->enrty_queue_lock);
 		return true;
 	} else {
 		if (search_with_user_vaddr)
@@ -442,7 +441,6 @@ u32 vidc_lookup_addr_table(struct video_client_ctx *client_ctx,
 			DBG("%s() : client_ctx = %p kernel_virt_addr = 0x%08lx"
 			" Not Found.\n", __func__, client_ctx,
 			*kernel_vaddr);
-		mutex_unlock(&client_ctx->enrty_queue_lock);
 		return false;
 	}
 }
@@ -462,11 +460,10 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 	struct msm_mapped_buffer *mapped_buffer = NULL;
 	size_t ion_len;
 	struct ion_handle *buff_ion_handle = NULL;
-	unsigned long ionflag;
 
 	if (!client_ctx || !length)
 		return false;
-	mutex_lock(&client_ctx->enrty_queue_lock);
+
 	if (buffer == BUFFER_TYPE_INPUT) {
 		buf_addr_table = client_ctx->input_buf_addr_table;
 		num_of_buffers = &client_ctx->num_of_input_buffers;
@@ -483,7 +480,7 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 	if (*num_of_buffers == max_num_buffers) {
 		ERR("%s(): Num of buffers reached max value : %d",
 			__func__, max_num_buffers);
-		goto bail_out_add;
+		return false;
 	}
 
 	i = 0;
@@ -494,27 +491,20 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 		DBG("%s() : client_ctx = %p."
 			" user_virt_addr = 0x%08lx already set",
 			__func__, client_ctx, user_vaddr);
-		goto bail_out_add;
+		return false;
 	} else {
 		if (!vcd_get_ion_status()) {
 			if (get_pmem_file(pmem_fd, &phys_addr,
 					kernel_vaddr, &len, &file)) {
 				ERR("%s(): get_pmem_file failed\n", __func__);
-				goto bail_out_add;
+				return false;
 			}
 			put_pmem_file(file);
 		} else {
 			buff_ion_handle = ion_import_fd(
 				client_ctx->user_ion_client, pmem_fd);
-			if (IS_ERR_OR_NULL(buff_ion_handle)) {
+			if (!buff_ion_handle) {
 				ERR("%s(): get_ION_handle failed\n",
-				 __func__);
-				goto bail_out_add;
-			}
-			if (ion_handle_get_flags(client_ctx->user_ion_client,
-						buff_ion_handle,
-						&ionflag)) {
-				ERR("%s():ION flags fail\n",
 				 __func__);
 				goto ion_error;
 			}
@@ -522,7 +512,7 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 				ion_map_kernel(
 				client_ctx->user_ion_client,
 				buff_ion_handle,
-				ionflag);
+				0);
 			if (!(*kernel_vaddr)) {
 				ERR("%s():ION virtual addr fail\n",
 				 __func__);
@@ -546,7 +536,7 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 		sizeof(vidc_mmu_subsystem)/sizeof(unsigned int));
 		if (IS_ERR(mapped_buffer)) {
 			pr_err("buffer map failed");
-			goto ion_error;
+			return false;
 		}
 		buf_addr_table[*num_of_buffers].client_data = (void *)
 			mapped_buffer;
@@ -564,15 +554,12 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 			"kernel_vaddr = 0x%08lx inserted!", __func__,
 			client_ctx, user_vaddr, *kernel_vaddr);
 	}
-	mutex_unlock(&client_ctx->enrty_queue_lock);
 	return true;
 ion_error:
 	if (*kernel_vaddr)
 		ion_unmap_kernel(client_ctx->user_ion_client, buff_ion_handle);
-	if (!IS_ERR_OR_NULL(buff_ion_handle))
+	if (buff_ion_handle)
 		ion_free(client_ctx->user_ion_client, buff_ion_handle);
-bail_out_add:
-	mutex_unlock(&client_ctx->enrty_queue_lock);
 	return false;
 }
 EXPORT_SYMBOL(vidc_insert_addr_table);
@@ -588,7 +575,7 @@ u32 vidc_delete_addr_table(struct video_client_ctx *client_ctx,
 
 	if (!client_ctx)
 		return false;
-	mutex_lock(&client_ctx->enrty_queue_lock);
+
 	if (buffer == BUFFER_TYPE_INPUT) {
 		buf_addr_table = client_ctx->input_buf_addr_table;
 		num_of_buffers = &client_ctx->num_of_input_buffers;
@@ -599,7 +586,7 @@ u32 vidc_delete_addr_table(struct video_client_ctx *client_ctx,
 	}
 
 	if (!*num_of_buffers)
-		goto bail_out_del;
+		return false;
 
 	i = 0;
 	while (i < *num_of_buffers &&
@@ -609,7 +596,7 @@ u32 vidc_delete_addr_table(struct video_client_ctx *client_ctx,
 		pr_err("%s() : client_ctx = %p."
 			" user_virt_addr = 0x%08lx NOT found",
 			__func__, client_ctx, user_vaddr);
-		goto bail_out_del;
+		return false;
 	}
 	msm_subsystem_unmap_buffer(
 	(struct msm_mapped_buffer *)buf_addr_table[i].client_data);
@@ -643,11 +630,7 @@ u32 vidc_delete_addr_table(struct video_client_ctx *client_ctx,
 	DBG("%s() : client_ctx = %p."
 		" user_virt_addr = 0x%08lx is found and deleted",
 		__func__, client_ctx, user_vaddr);
-	mutex_unlock(&client_ctx->enrty_queue_lock);
 	return true;
-bail_out_del:
-	mutex_unlock(&client_ctx->enrty_queue_lock);
-	return false;
 }
 EXPORT_SYMBOL(vidc_delete_addr_table);
 
