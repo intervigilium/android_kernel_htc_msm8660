@@ -67,6 +67,7 @@
 #include <mach/msm_spi.h>
 #include <mach/msm_serial_hs.h>
 #include <mach/msm_serial_hs_lite.h>
+#include <mach/bcm_bt_lpm.h>
 #include <mach/msm_iomap.h>
 #include <mach/msm_memtypes.h>
 #include <asm/mach/mmc.h>
@@ -81,7 +82,6 @@
 #ifdef CONFIG_BT
 #include <mach/htc_bdaddress.h>
 #endif
-#include <mach/htc_usb.h>
 #include <mach/gpiomux.h>
 #ifdef CONFIG_MSM_DSPS
 #include <mach/msm_dsps.h>
@@ -95,7 +95,7 @@
 #include <mach/htc_headset_8x60.h>
 #include <linux/i2c/isl9519.h>
 #ifdef CONFIG_USB_G_ANDROID
-#include <linux/usb/android_composite.h>
+#include <linux/usb/android.h>
 #include <mach/tpa2051d3.h>
 #include <mach/usbdiag.h>
 #endif
@@ -117,7 +117,7 @@
 #include "spm.h"
 #include "rpm_log.h"
 #include "timer.h"
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 #include <mach/mhl.h>
 #endif
 #include "gpiomux-8x60.h"
@@ -1244,18 +1244,7 @@ static int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 }
 
 static struct android_usb_platform_data android_usb_pdata = {
-	.vendor_id	= 0x0BB4,
-	.product_id	= 0x0c86,
-	.version	= 0x0100,
-	.product_name		= "Android Phone",
-	.manufacturer_name	= "HTC",
-	.num_products = ARRAY_SIZE(usb_products),
-	.products = usb_products,
-	.num_functions = ARRAY_SIZE(usb_functions_all),
-	.functions = usb_functions_all,
 	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
-	.usb_id_pin_gpio = PYRAMID_GPIO_USB_ID,
-	.fserial_init_string = "tty:modem,tty,tty:serial",
 };
 
 static struct platform_device android_usb_device = {
@@ -1940,10 +1929,12 @@ static struct resource msm_fb_resources[] = {
 	{
 		.flags  = IORESOURCE_DMA,
 	},
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 	/* for overlay write back operation */
 	{
 		.flags  = IORESOURCE_DMA,
 	},
+#endif
 };
 
 #ifdef CONFIG_ANDROID_PMEM
@@ -2103,16 +2094,19 @@ static struct platform_device android_pmem_smipool_device = {
 
 static void __init msm8x60_allocate_memory_regions(void)
 {
+	void *addr;
 	unsigned long size;
 
 	size = MSM_FB_SIZE;
-	msm_fb_resources[0].start = MSM_FB_BASE;
+
+	addr = alloc_bootmem_align(size, 0x1000);
+	msm_fb_resources[0].start = __pa(addr);
 	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
 	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for fb\n",
-		size, __va(MSM_FB_BASE), (unsigned long) MSM_FB_BASE);
+		size, addr, __pa(addr));
 
-#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
-	size = MSM_FB_WRITEBACK_SIZE;
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
+	size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
 	msm_fb_resources[1].start = MSM_FB_WRITEBACK_BASE;
 	msm_fb_resources[1].end = msm_fb_resources[1].start + size - 1;
 	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for overlay\n",
@@ -2286,14 +2280,52 @@ static struct attribute_group pyramid_properties_attr_group = {
 
 #define TS_PEN_IRQ_GPIO 61
 #ifdef CONFIG_SERIAL_MSM_HS
-static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-	.inject_rx_on_wakeup = 0,
-	.cpu_lock_supported = 1,
+static int configure_uart_gpios(int on)
+{
+	int ret = 0, i;
+	int uart_gpios[] = {
+		PYRAMID_GPIO_BT_UART1_TX,
+		PYRAMID_GPIO_BT_UART1_RX,
+		PYRAMID_GPIO_BT_UART1_CTS,
+		PYRAMID_GPIO_BT_UART1_RTS,
+	};
+	for (i = 0; i < ARRAY_SIZE(uart_gpios); i++) {
+		if (on) {
+			ret = msm_gpiomux_get(uart_gpios[i]);
+			if (unlikely(ret))
+				break;
+		} else {
+			ret = msm_gpiomux_put(uart_gpios[i]);
+			if (unlikely(ret))
+				return ret;
+		}
+	}
+	if (ret)
+		for (; i >= 0; i--)
+			msm_gpiomux_put(uart_gpios[i]);
+	return ret;
+}
 
-	/* for brcm BT */
-	.bt_wakeup_pin_supported = 1,
-	.bt_wakeup_pin = PYRAMID_GPIO_BT_CHIP_WAKE,
-	.host_wakeup_pin = PYRAMID_GPIO_BT_HOST_WAKE,
+static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
+	.wakeup_irq = -1,
+	.inject_rx_on_wakeup = 0,
+	.gpio_config = configure_uart_gpios,
+	.exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked,
+};
+
+static struct bcm_bt_lpm_platform_data bcm_bt_lpm_pdata = {
+	.gpio_wake = PYRAMID_GPIO_BT_CHIP_WAKE,
+	.gpio_host_wake = PYRAMID_GPIO_BT_HOST_WAKE,
+	.request_clock_off_locked = msm_hs_request_clock_off_locked,
+	.request_clock_on_locked = msm_hs_request_clock_on_locked,
+};
+
+struct platform_device pyramid_bcm_bt_lpm_device = {
+	.name = "bcm_bt_lpm",
+	.id = 0,
+	.dev = {
+		.platform_data = &bcm_bt_lpm_pdata,
+	},
 };
 #endif
 
@@ -2968,7 +3000,7 @@ static struct platform_device ram_console_device = {
 	.resource	= ram_console_resources,
 };
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static void mhl_sii9234_1v2_power(bool enable);
 #endif
 
@@ -3039,7 +3071,7 @@ static void pyramid_usb_dpdn_switch(int path)
 	}
 	}
 
-	#ifdef CONFIG_FB_MSM_HDMI_MHL
+	#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	sii9234_change_usb_owner((path == PATH_MHL)?1:0);
 	#endif
 }
@@ -3057,7 +3089,7 @@ static struct cable_detect_platform_data cable_detect_pdata = {
 		.usbid_amux	= PM_MPP_AIN_AMUX_CH5,
 	},
 	.config_usb_id_gpios = config_pyramid_usb_id_gpios,
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
 #endif
 };
@@ -3127,7 +3159,7 @@ static struct platform_device pm8058_leds = {
 	},
 };
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static struct regulator *reg_8901_l0;
 static struct regulator *reg_8058_l19;
 static struct regulator *reg_8901_l3;
@@ -3242,7 +3274,6 @@ static int mhl_sii9234_all_power(bool enable)
 	return 0;
 }
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static uint32_t mhl_gpio_table[] = {
 	GPIO_CFG(PYRAMID_GPIO_MHL_RESET, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	GPIO_CFG(PYRAMID_GPIO_MHL_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
@@ -3270,10 +3301,8 @@ static T_MHL_PLATFORM_DATA mhl_sii9234_device_data = {
 	.gpio_intr = PYRAMID_GPIO_MHL_INT,
 	.gpio_reset = PYRAMID_GPIO_MHL_RESET,
 	.ci2ca = 0,
-	#ifdef CONFIG_FB_MSM_HDMI_MHL
 	.mhl_usb_switch		= pyramid_usb_dpdn_switch,
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
-	#endif
 	.power = mhl_sii9234_power,
 };
 
@@ -3285,7 +3314,6 @@ static struct i2c_board_info msm_i2c_gsbi7_mhl_sii9234_info[] =
 		.irq = MSM_GPIO_TO_INT(PYRAMID_GPIO_MHL_INT)
 	},
 };
-#endif
 #endif
 
 
@@ -3305,6 +3333,7 @@ static struct platform_device *pyramid_devices[] __initdata = {
 #endif
 #ifdef CONFIG_SERIAL_MSM_HS
 	&msm_device_uart_dm1,
+	&pyramid_bcm_bt_lpm_device,
 #endif
 #ifdef CONFIG_MSM_SSBI
 	&msm_device_ssbi_pmic1,
@@ -4727,17 +4756,13 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		ARRAY_SIZE(msm_i2c_gsbi7_tpa2051d3_info),
 	},
 #endif
-#ifdef CONFIG_FB_MSM_HDMI_MHL
 #ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
-
 	{
 		I2C_SURF | I2C_FFA,
 		MSM_GSBI7_QUP_I2C_BUS_ID,
 		msm_i2c_gsbi7_mhl_sii9234_info,
 		ARRAY_SIZE(msm_i2c_gsbi7_mhl_sii9234_info),
 	},
-
-#endif
 #endif
 	{
 		I2C_SURF | I2C_FFA,
@@ -4875,8 +4900,6 @@ static void __init msm8x60_init_buses(void)
 #endif
 
 #ifdef CONFIG_SERIAL_MSM_HS
-	msm_uart_dm1_pdata.rx_wakeup_irq = gpio_to_irq(PYRAMID_GPIO_BT_HOST_WAKE);
-	msm_device_uart_dm1.name = "msm_serial_hs_brcm"; /* for brcm BT */
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 #endif
 
@@ -5910,6 +5933,114 @@ error:
 }
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
+#ifdef CONFIG_MSM_BUS_SCALING
+
+static struct msm_bus_vectors rotator_init_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = 0,
+		.ib = 0,
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 0,
+		.ib = 0,
+	},
+};
+
+static struct msm_bus_vectors rotator_ui_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = 0,
+		.ib = 0,
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = (1024 * 600 * 4 * 2 * 60),
+		.ib = (1024 * 600 * 4 * 2 * 60 * 1.5),
+	},
+};
+
+static struct msm_bus_vectors rotator_vga_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = (640 * 480 * 2 * 2 * 30),
+		.ib = (640 * 480 * 2 * 2 * 30 * 1.5),
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = (640 * 480 * 2 * 2 * 30),
+		.ib = (640 * 480 * 2 * 2 * 30 * 1.5),
+	},
+};
+
+static struct msm_bus_vectors rotator_720p_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab  = (1280 * 736 * 2 * 2 * 30),
+		.ib  = (1280 * 736 * 2 * 2 * 30 * 1.5),
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = (1280 * 736 * 2 * 2 * 30),
+		.ib  = (1280 * 736 * 2 * 2 * 30 * 1.5),
+	},
+};
+
+static struct msm_bus_vectors rotator_1080p_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab  = (1920 * 1088 * 2 * 2 * 30),
+		.ib  = (1920 * 1088 * 2 * 2 * 30 * 1.5),
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = (1920 * 1088 * 2 * 2 * 30),
+		.ib  = (1920 * 1088 * 2 * 2 * 30 * 1.5),
+	},
+};
+
+static struct msm_bus_paths rotator_bus_scale_usecases[] = {
+	{
+		ARRAY_SIZE(rotator_init_vectors),
+		rotator_init_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_ui_vectors),
+		rotator_ui_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_vga_vectors),
+		rotator_vga_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_720p_vectors),
+		rotator_720p_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_1080p_vectors),
+		rotator_1080p_vectors,
+	},
+};
+
+struct msm_bus_scale_pdata rotator_bus_scale_pdata = {
+	rotator_bus_scale_usecases,
+	ARRAY_SIZE(rotator_bus_scale_usecases),
+	.name = "rotator",
+};
+
+#endif
+
 #ifdef CONFIG_FB_MSM_TVOUT
 static struct regulator *reg_8058_l13;
 
@@ -6072,13 +6203,6 @@ static struct msm_board_data pyramid_board_data __initdata = {
 void pyramid_add_usb_devices(void)
 {
 	printk(KERN_INFO "%s rev: %d\n", __func__, system_rev);
-	android_usb_pdata.products[0].product_id =
-			android_usb_pdata.product_id;
-
-
-	/* diag bit set */
-	if (get_radio_flag() & 0x20000)
-		android_usb_pdata.diag_init = 1;
 
 	msm_device_gadget_peripheral.dev.parent = &msm_device_otg.dev;
 	platform_device_register(&msm_device_gadget_peripheral);
@@ -6087,7 +6211,6 @@ void pyramid_add_usb_devices(void)
 
 static int __init board_serialno_setup(char *serialno)
 {
-	android_usb_pdata.serial_number = serialno;
 	return 1;
 }
 __setup("androidboot.serialno=", board_serialno_setup);
