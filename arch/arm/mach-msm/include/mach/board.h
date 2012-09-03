@@ -413,7 +413,6 @@ struct msm_panel_common_pdata {
 	struct mdp_reg *color_enhancment_tbl;
 };
 
-
 struct lcdc_platform_data {
 	int (*lcdc_gpio_config)(int on);
 	int (*lcdc_power_save)(int);
@@ -443,7 +442,7 @@ struct mipi_dsi_platform_data {
 	int (*esd_fixup)(uint32_t mfd_data);
 	int (*dsi_client_reset)(void);
 	int (*get_lane_config)(void);
-    char (*splash_is_enabled)(void);
+	char (*splash_is_enabled)(void);
 	int target_type;
 };
 
@@ -468,8 +467,8 @@ struct mipi_dsi_panel_platform_data {
 	int fpga_3d_config_addr;
 	int *gpio;
 	struct mipi_dsi_phy_ctrl *phy_ctrl_settings;
-    void (*dsi_pwm_cfg)(void);
-    char dlane_swap;
+	void (*dsi_pwm_cfg)(void);
+	char dlane_swap;
 };
 
 #define PANEL_NAME_MAX_LEN 50
@@ -492,8 +491,8 @@ struct msm_hdmi_platform_data {
 	int (*enable_5v)(int on);
 	int (*core_power)(int on, int show);
 	int (*cec_power)(int on);
-    int (*panel_power)(int on);
-    int (*gpio_config)(int on);
+	int (*panel_power)(int on);
+	int (*gpio_config)(int on);
 	int (*init_irq)(void);
 	bool (*check_hdcp_hw_support)(void);
 };
@@ -525,11 +524,12 @@ struct msm_vidc_platform_data {
 	u32 enable_ion;
 	int disable_dmx;
 	int disable_fullhd;
-    u32 cp_enabled;
+	u32 cp_enabled;
 #ifdef CONFIG_MSM_BUS_SCALING
 	struct msm_bus_scale_pdata *vidc_bus_client_pdata;
 #endif
-    int disable_turbo;
+	int disable_turbo;
+        int cont_mode_dpb_count;
 };
 
 #if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
