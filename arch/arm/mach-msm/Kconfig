@@ -365,6 +365,7 @@ config MACH_PRIMODD
 		depends on ARCH_MSM7X27A
 		depends on !MSM_STACKED_MEMORY
 		default n
+		select FB_MSM_MIPI_VIDEO_ONLY
 		bool "Primodd_ct"
 		help
 			Support for Primodd_ct (PDA phone).
@@ -373,6 +374,7 @@ config MACH_PRIMODS
 		depends on ARCH_MSM7X27A
 		depends on !MSM_STACKED_MEMORY
 		default n
+		select FB_MSM_MIPI_VIDEO_ONLY
 		bool "Primods"
 		help
 			Support for Primods (PDA phone).
@@ -445,6 +447,27 @@ config MACH_FLYER
        help
          Support for the Qualcomm Flyer board.
 
+config MACH_VIVO
+       depends on ARCH_MSM7X30
+       default n
+       bool "Vivo"
+       help
+         Support for the Qualcomm Vivo board.
+
+config MACH_VIVOW
+       depends on ARCH_MSM7X30
+       default n
+       bool "Vivow"
+       help
+         Support for the Qualcomm Vivow board.
+
+config MACH_VIVOW_CT
+       depends on ARCH_MSM7X30
+       default n
+       bool "Vivow_ct"
+       help
+         Support for the Qualcomm Vivow_ct board.
+
 config MACH_BLISSC
        depends on ARCH_MSM7X30
        default n
@@ -459,6 +482,27 @@ config MACH_BLISS
        help
          Support for the Qualcomm Bliss board.
 
+config MACH_SPADE
+       depends on ARCH_MSM7X30
+       default n
+       bool "Spade"
+       help
+         Support for the Qualcomm Spade board.
+
+config MACH_SAGA
+       depends on ARCH_MSM7X30
+       default n
+       bool "Saga"
+       help
+         Support for the Qualcomm Saga board.
+
+config MACH_MECHA
+       depends on ARCH_MSM7X30
+       default n
+       bool "Mecha"
+       help
+         Support for the Qualcomm Mecha board.
+
 config MACH_KINGDOM
        depends on ARCH_MSM7X30
        default n
@@ -470,6 +514,13 @@ config MACH_PRIMOU
        depends on ARCH_MSM7X30
        default n
        bool "Primou"
+       select ARCH_SPARSEMEM_ENABLE
+       select MEMORY_HOTPLUG
+       select MEMORY_HOTREMOVE
+       select ARCH_ENABLE_MEMORY_HOTPLUG
+       select ARCH_ENABLE_MEMORY_HOTREMOVE
+       select ARCH_MEMORY_PROBE
+       select ARCH_MEMORY_REMOVE
        help
          Support for the Qualcomm Primou board.
 
@@ -477,6 +528,13 @@ config MACH_PRIMOC
        depends on ARCH_MSM7X30
        default n
        bool "Primoc"
+       select ARCH_SPARSEMEM_ENABLE
+       select MEMORY_HOTPLUG
+       select MEMORY_HOTREMOVE
+       select ARCH_ENABLE_MEMORY_HOTPLUG
+       select ARCH_ENABLE_MEMORY_HOTREMOVE
+       select ARCH_MEMORY_PROBE
+       select ARCH_MEMORY_REMOVE
        help
          Support for the Qualcomm Primoc board.
 
@@ -809,12 +867,32 @@ config MACH_KNIGHT
 	bool "Knight"
 	help
 	  Support for the HTC Knight
+
+config MACH_RUNNYMEDE
+	depends on ARCH_MSM7X30
+	bool "Runnymede"
+	select ARCH_SPARSEMEM_ENABLE
+	select MEMORY_HOTPLUG
+	select MEMORY_HOTREMOVE
+	select ARCH_ENABLE_MEMORY_HOTPLUG
+	select ARCH_ENABLE_MEMORY_HOTREMOVE
+	select ARCH_MEMORY_PROBE
+	select ARCH_MEMORY_REMOVE
+	help
+	  Support for the HTC Runnymede
 endmenu
 
 config MSM_MDP40
 	bool
 	depends on ARCH_MSM7X30 || ARCH_MSM8X60
 	default y
+
+config FB_MSM_MIPI_VIDEO_ONLY
+	depends on ARCH_MSM7X27A
+	default n
+	bool
+	help
+	  Use for VIDEO mode only panel
 
 config MSM_STACKED_MEMORY
 	bool "Stacked Memory"
@@ -1359,8 +1437,8 @@ config MSM_DSPS
 
 config MSM_SDIO_CTL
 	bool "SDIO CTL Driver"
-	depends on MSM_SDIO_CMUX
-	default n
+	depends on MSM_SDIO_AL
+	default y
 	help
 	  Provides a binary SDIO control port interface.
 
@@ -1482,7 +1560,7 @@ config MSM_SDIO_SMEM
 
 config MSM_DALRPC
 	bool "DAL RPC support"
-	depends on ARCH_MSM_SCORPION || ARCH_MSM_KRAIT
+	depends on ARCH_MSM_SCORPION || ARCH_MSM_KRAIT || ARCH_MSM7X27A
 	default y
 	help
 	  Supports RPC calls to DAL devices on remote processor cores.
@@ -1615,6 +1693,18 @@ config MSM8X60_FTM_AUDIO_DEVICES
 	  Enable support audio factory test mode devices.  This is used
 	  in a production line environment.
 
+config HTC_OFFMODE_ALARM
+	bool "Enables HTC offmode alarm."
+	default n
+	help
+	support HTC offmode alarm.
+
+config HTC_QUICKBOOT_OFFMODE_ALARM
+	bool "Support HTC quickboot offmode alarm."
+	default n
+	help
+	support HTC quickboot offmode alarm.
+
 config RTAC
 	bool "MSM8K real-time audio calibration support"
 	default y
@@ -1709,10 +1799,10 @@ config MSM_SLEEP_TIME_OVERRIDE
 	  testing.
 
 config HTC_OFFMODE_ALARM
-       bool "Enables HTC offmode alarm."
-       default n
-       help
-               support HTC offmode alarm.
+	bool "Enables HTC offmode alarm."
+	default n
+	help
+		support HTC offmode alarm.
 
 config HTC_QUICKBOOT_OFFMODE_ALARM
         bool "Support HTC quickboot offmode alarm."
@@ -2156,6 +2246,13 @@ config MSM_RPC_VIBRATOR
 	  Enable the vibrator support on MSM over RPC. The vibrator
 	  is connected on the PMIC. Say Y if you want to enable this
 	  feature.
+config RPC_VER_60001
+	bool "rpc ver 60001"
+	depends on MSM_ONCRPCROUTER
+        help
+          Enable the vibrator support on MSM over RPC. The vibrator
+          is connected on the PMIC. Say Y if you want to enable this
+          feature.
 
 config PM8XXX_RPC_VIBRATOR
 	bool "RPC based Vibrator on PM8xxx PMICs"
@@ -2246,4 +2343,9 @@ config REMOVE_EBI1_FIXED_CLK
 	help
 		use for 2x Radio
 
+config HTC_ACCESSORY_ONEWIRE
+        tristate "HTC accessory one wire protocol driver"
+        default n
+        help
+          Provides support of HTC one wire protocol driver.
 endif

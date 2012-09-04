@@ -3409,6 +3409,26 @@ void print_modules(void)
 	printk("\n");
 }
 
+#ifdef CONFIG_WIMAX
+bool find_wimax_modules(void)
+{
+	struct module *mod;
+    bool ret = false;
+
+	/* Most callers should already have preempt disabled, but make sure */
+	preempt_disable();
+	list_for_each_entry_rcu(mod, &modules, list) {
+		if (strcmp(mod->name, "sequans_sdio") == 0) {
+		    ret = true;
+		    break;
+		}
+	}
+	preempt_enable();
+
+	return ret;
+}
+#endif
+
 #ifdef CONFIG_MODVERSIONS
 /* Generate the signature for all relevant module structures here.
  * If these change, we don't want to try to parse the module. */

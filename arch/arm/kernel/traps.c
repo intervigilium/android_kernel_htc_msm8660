@@ -288,6 +288,13 @@ void die(const char *str, struct pt_regs *regs, int err)
 	raw_spin_unlock_irq(&die_lock);
 	oops_exit();
 
+#ifdef CONFIG_WIMAX
+	if (find_wimax_modules()) {
+	    printk(KERN_ALERT "[WIMAX] ignore this exception in %s\n", __func__);
+        return;
+    }
+#endif
+
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 	if (panic_on_oops)

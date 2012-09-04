@@ -17,11 +17,14 @@ obj-$(CONFIG_OV2720) += ov2720.o
 obj-$(CONFIG_SP3D) += sp3d.o
 obj-$(CONFIG_QS_S5K4E1) += qs_s5k4e1.o
 
+obj-$(CONFIG_MACH_MECHA) += s5k6aafx_reg_mecha.o #HTC_CAM chuck
 obj-$(CONFIG_MACH_HOLIDAY) += s5k3h2yx_reg_holiday.o s5k6aafx_reg_holiday.o s5k6aafx_reg_holiday_cob.o
 obj-$(CONFIG_MACH_VIGOR) += s5k3h2yx_reg_vigor.o ov8830_reg_vigor.o mt9d015_reg_vigor.o
 obj-$(CONFIG_MACH_RUBY) += s5k3h2yx_reg_holiday.o mt9d015_reg_vigor.o
 obj-$(CONFIG_MACH_RIDER) += s5k3h2yx_reg_holiday.o s5k6aafx_reg_rider.o s5k6aafx_reg_rider_cob.o ov8830_reg_vigor.o
 obj-$(CONFIG_MACH_RUNNYMEDE) += s5k3h2yx_reg_runnymede.o ov8830_reg_runnymede.o s5k6aafx_reg_runnymede_cob.o
-
+obj-$(CONFIG_MACH_KINGDOM) += s5k6aafx_reg_kingdom_cob.o s5k6aafx_reg_kingdom.o
 obj-$(CONFIG_MACH_SHOOTER) += sp3d_reg_3d.o sp3d_reg_2d.o sp3d_reg_com.o sp3d_reg_cal.o s5k6aafx_reg_shooter.o qs_s5k4e1_reg.o s5k6aafx_reg_shooter_cob.o
+obj-$(CONFIG_MACH_SHOOTER_K) += sp3d_reg_3d.o sp3d_reg_2d.o sp3d_reg_com.o sp3d_reg_cal.o s5k6aafx_reg_shooter.o qs_s5k4e1_reg.o s5k6aafx_reg_shooter_cob.o
 obj-$(CONFIG_MACH_SHOOTER_U) += sp3d_reg_3d.o sp3d_reg_2d.o sp3d_reg_com.o sp3d_reg_cal.o s5k6aafx_reg_shooter.o qs_s5k4e1_reg.o s5k6aafx_reg_shooter_cob.o
+obj-$(CONFIG_MACH_SHOOTER_CT) += sp3d_reg_3d.o sp3d_reg_2d.o sp3d_reg_com.o sp3d_reg_cal.o s5k6aafx_reg_shooter.o qs_s5k4e1_reg.o s5k6aafx_reg_shooter_cob.o

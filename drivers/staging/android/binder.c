@@ -431,6 +431,9 @@ repeat:
 
 out:
 	spin_unlock(&files->file_lock);
+#ifdef CONFIG_DEBUG_FDLEAK
+	fd_num_check(files, fd);
+#endif
 	return error;
 }
 
