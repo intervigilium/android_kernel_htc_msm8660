@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,10 +13,10 @@
 #ifndef _VCD_H_
 #define _VCD_H_
 
-#include "vcd_api.h"
+#include <media/msm/vcd_api.h>
+#include "vcd_util.h"
 #include "vcd_ddl_api.h"
 #include "vcd_res_tracker_api.h"
-#include "vcd_util.h"
 #include "vcd_client_sm.h"
 #include "vcd_core.h"
 #include "vcd_device_sm.h"
@@ -389,5 +389,10 @@ void vcd_handle_clnt_fatal_input_done(struct vcd_clnt_ctxt *cctxt,
 
 void vcd_handle_ind_info_output_reconfig
 	(struct vcd_clnt_ctxt *cctxt, u32 status);
+
+u32 vcd_req_perf_level(struct vcd_clnt_ctxt *cctxt,
+	struct vcd_property_perf_level *);
+
+u32 vcd_set_num_slices(struct vcd_clnt_ctxt *cctxt);
 
 #endif
