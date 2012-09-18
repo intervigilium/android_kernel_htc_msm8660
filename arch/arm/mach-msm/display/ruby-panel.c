@@ -38,7 +38,9 @@
 #include "../devices-msm8x60.h"
 #include "../../../../drivers/video/msm/mdp_hw.h"
 
+#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
 void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size);
+#endif
 
 /*
 TODO:
@@ -768,17 +770,19 @@ static struct mdp_reg ruy_auo_gamma[] = {
 static int ruby_mdp_color_enhance(void)
 {
 	PR_DISP_INFO("%s\n", __func__);
+#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
 	mdp_color_enhancement(ruby_color_enhancement, ARRAY_SIZE(ruby_color_enhancement));
-
+#endif
 	return 0;
 }
 
 static int ruby_mdp_gamma(void)
 {
 	PR_DISP_INFO("%s\n", __func__);
+#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
 	if (panel_type == PANEL_ID_PYD_AUO_NT)
 		mdp_color_enhancement(ruy_auo_gamma, ARRAY_SIZE(ruy_auo_gamma));
-
+#endif
 	return 0;
 }
 
