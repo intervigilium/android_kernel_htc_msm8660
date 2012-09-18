@@ -2996,22 +2996,24 @@ struct msm_bus_scale_pdata rotator_bus_scale_pdata = {
 
 static void __init msm8x60_allocate_memory_regions(void)
 {
-	unsigned long size;
+	void *addr;
+    unsigned long size;
 
 	size = MSM_FB_SIZE;
-	msm_fb_resources[0].start = MSM_FB_BASE;
+	
+    addr = alloc_bootmem_align(size, 0x1000);
+    msm_fb_resources[0].start = __pa(addr);
 	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
 	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
-		size, __va(msm_fb_resources[0].start),
-		(unsigned long)msm_fb_resources[0].start);
+		size, addr, __pa(addr));
 
-	msm_fb_resources[1].start = MSM_OVERLAY_BLT_BASE;
-	msm_fb_resources[1].end = msm_fb_resources[1].start +
-		MSM_OVERLAY_BLT_SIZE - 1;
-	pr_info("allocating %lu bytes at %p (%lx physical) for "
-		"overlay write back\n", (unsigned long)MSM_OVERLAY_BLT_SIZE,
-		__va(msm_fb_resources[1].start),
-		(unsigned long)msm_fb_resources[1].start);
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
+	size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
+	msm_fb_resources[1].start = MSM_FB_WRITEBACK_BASE;
+	msm_fb_resources[1].end = msm_fb_resources[1].start + size - 1;
+	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for overlay\n",
+            size, __va(MSM_FB_WRITEBACK_BASE), (unsigned long) MSM_FB_WRITEBACK_BASE);
+#endif
 }
 
 
