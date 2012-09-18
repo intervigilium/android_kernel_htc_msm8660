@@ -456,6 +456,8 @@ static int msm_fb_detect_panel(const char *name)
 
 static struct msm_fb_platform_data msm_fb_pdata = {
 	.detect_client = msm_fb_detect_panel,
+    .prim_panel_name = "mipi_cmd_novatek_qhd",
+    .ext_panel_name = "",
 	.blt_mode = 1,
 	.width = 53,
 	.height = 95,
