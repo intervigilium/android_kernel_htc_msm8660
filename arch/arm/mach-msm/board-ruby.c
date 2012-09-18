@@ -1598,13 +1598,15 @@ static void config_ruby_usb_id_gpios(bool output)
 	}
 }
 
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static uint32_t mhl_usb_switch_table[] = {
 	GPIO_CFG(RUBY_GPIO_MHL_USB_SEL, 0, GPIO_CFG_OUTPUT,
 		GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
-
+#endif
 static void ruby_usb_dpdn_switch(int path)
 {
+    #ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	switch (path) {
 	case PATH_USB:
 	case PATH_MHL:
@@ -1627,9 +1629,9 @@ static void ruby_usb_dpdn_switch(int path)
 	}
 	}
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
+
 	sii9234_change_usb_owner((path == PATH_MHL) ? 1 : 0);
-#endif
+    #endif
 }
 
 static struct cable_detect_platform_data cable_detect_pdata = {
@@ -2249,19 +2251,20 @@ static struct platform_device msm_gemini_device = {
 /*
  * =============== HDMI related function (BEGIN) ===============
  */
+
+#define _GET_REGULATOR(var, name) do {				\
+var = regulator_get(NULL, name);			\
+if (IS_ERR(var)) {					\
+pr_err("'%s' regulator not found, rc=%ld\n",	\
+name, IS_ERR(var));			\
+var = NULL;					\
+return -ENODEV;					\
+}							\
+} while (0)
+
 #ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 
 static int pm8901_mpp0_init(void);
-
-#define _GET_REGULATOR(var, name) do {				\
-	var = regulator_get(NULL, name);			\
-	if (IS_ERR(var)) {					\
-		pr_err("'%s' regulator not found, rc=%ld\n",	\
-			name, IS_ERR(var));			\
-		var = NULL;					\
-		return -ENODEV;					\
-	}							\
-} while (0)
 
 static int Swa_pmic_pwr_off(char *power)
 {

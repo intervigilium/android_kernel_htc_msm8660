@@ -118,7 +118,7 @@ extern void sii9234_change_usb_owner(bool bMHL);
 #define RUBY_FLASH_EN             (138)
 #define RUBY_TORCH_EN             (30)
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 /* MHL */
 #define RUBY_GPIO_H2W_3V3_EN		(0)
 #define RUBY_GPIO_MHL_RST_N		(2)
