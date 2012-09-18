@@ -125,7 +125,7 @@
 #include "spm.h"
 #include "rpm_log.h"
 #include "timer.h"
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 #include <mach/mhl.h>
 #endif
 #include "gpiomux-8x60.h"
@@ -395,7 +395,7 @@ static void (*sdc2_status_notify_cb)(int card_present, void *dev_id);
 static void *sdc2_status_notify_cb_devid;
 #endif
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static void mhl_sii9234_1v2_power(bool enable);
 #endif
 
@@ -1627,7 +1627,7 @@ static void ruby_usb_dpdn_switch(int path)
 	}
 	}
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	sii9234_change_usb_owner((path == PATH_MHL) ? 1 : 0);
 #endif
 }
@@ -1644,7 +1644,7 @@ static struct cable_detect_platform_data cable_detect_pdata = {
 		.usbid_amux	= PM_MPP_AIN_AMUX_CH5,
 	},
 	.config_usb_id_gpios	= config_ruby_usb_id_gpios,
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	.mhl_reset_gpio = RUBY_GPIO_MHL_RST_N,
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
 #endif
@@ -2249,7 +2249,7 @@ static struct platform_device msm_gemini_device = {
 /*
  * =============== HDMI related function (BEGIN) ===============
  */
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 
 static int pm8901_mpp0_init(void);
 
@@ -2351,8 +2351,6 @@ static void mhl_sii9234_1v2_power(bool enable)
 	prev_on = enable;
 }
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
-
 static int mhl_sii9234_power(int on)
 {
 	int rc = 0;
@@ -2396,7 +2394,6 @@ static struct i2c_board_info msm_i2c_gsbi7_mhl_sii9234_info[] =
 		.irq = MSM_GPIO_TO_INT(RUBY_GPIO_MHL_INTR_N)
 	},
 };
-#endif	/* CONFIG_FB_MSM_HDMI_MHL_SII9234 */
 
 static struct gpiomux_setting mhl_gpiomux_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -2420,7 +2417,7 @@ static void ruby_mhl_init(void)
 	gpio_set_value(RUBY_GPIO_H2W_3V3_EN, 0);
 }
 
-#endif	/* CONFIG_FB_MSM_HDMI_MHL */
+#endif	/* CONFIG_FB_MSM_HDMI_MHL_SII9234 */
 
 #ifdef CONFIG_I2C_QUP
 /* CAMERA setting */
@@ -5234,7 +5231,7 @@ static struct spi_board_info msm_spi_board_info[] __initdata = {
 
 #define PM8901_GPIO_INT		   91
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static int pm8901_mpp0_init(void)
 {
 	int rc;
@@ -5632,7 +5629,6 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		msm_tps_65200_boardinfo,
 		ARRAY_SIZE(msm_tps_65200_boardinfo),
 	},
-#ifdef CONFIG_FB_MSM_HDMI_MHL
 #ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	{
 		I2C_SURF | I2C_FFA,
@@ -5640,7 +5636,6 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		msm_i2c_gsbi7_mhl_sii9234_info,
 		ARRAY_SIZE(msm_i2c_gsbi7_mhl_sii9234_info),
 	},
-#endif
 #endif
 	{
 		I2C_SURF | I2C_FFA,
@@ -7528,7 +7523,7 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 	msm8x60_init_tlmm();
 	msm8x60_init_gpiomux(board_data->gpiomux_cfgs);
 	msm8x60_init_uart12dm();
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	msm_gpiomux_install(mhl_gpiomux_configs, ARRAY_SIZE(mhl_gpiomux_configs));
 #endif
 	msm8x60_init_mmc();
@@ -7577,7 +7572,7 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 
 config_gpio_table(gyro_ID_PIN_input_table, ARRAY_SIZE(gyro_ID_PIN_input_table));
 	printk(KERN_INFO "%s , set gyro ID %d input  pull down after detct gyro compeletly\n",  __func__, RUBY_GPIO_GYRO_ID);
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	ruby_mhl_init();
 #endif
 
