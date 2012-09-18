@@ -397,6 +397,7 @@ static struct mipi_dsi_platform_data mipi_pdata = {
 #define PWM_DEFAULT	\
 	(panel_type == PANEL_ID_PYD_AUO_NT ? PWM_DEFAULT_AUO:PWM_DEFAULT_SHARP)
 
+#if 0
 static unsigned char ruby_shrink_pwm(int val)
 {
 	unsigned char shrink_br = BRI_SETTING_MAX;
@@ -418,9 +419,9 @@ static unsigned char ruby_shrink_pwm(int val)
 
 	return shrink_br;
 }
+#endif
 
-static struct msm_panel_common_pdata mipi_novatek_panel_data = {
-	.shrink_pwm = NULL,
+static struct static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
 };
 
 static struct platform_device mipi_dsi_cmd_sharp_qhd_panel_device = {
@@ -826,11 +827,14 @@ int __init ruby_init_panel(struct resource *res, size_t size)
 	/*	 mipi_dsi_cmd_sharp_qhd_panel_device.name = "mipi_orise"; */
 
 	PR_DISP_INFO("%s: %s\n", __func__, mipi_dsi_cmd_sharp_qhd_panel_device.name);
-
+#if 0
 	mipi_novatek_panel_data.shrink_pwm = ruby_shrink_pwm;
-
+#endif
 	msm_fb_device.resource = res;
 	msm_fb_device.num_resources = size;
+    
+    mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
+	mdp_pdata.ov1_wb_size = MSM_FB_OVERLAY1_WRITEBACK_SIZE;
 
 	ret = platform_device_register(&msm_fb_device);
 	ret = platform_device_register(&mipi_dsi_cmd_sharp_qhd_panel_device);
