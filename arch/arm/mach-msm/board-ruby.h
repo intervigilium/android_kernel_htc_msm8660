@@ -27,11 +27,41 @@
 #define MSM_RAM_CONSOLE_BASE	MSM_HTC_RAM_CONSOLE_PHYS
 #define MSM_RAM_CONSOLE_SIZE	MSM_HTC_RAM_CONSOLE_SIZE
 
+#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
+#define MSM_FB_PRIM_BUF_SIZE (960 * ALIGN(540, 32) * 4 * 3) /* 4 bpp x 3 pages */
+#else
+#define MSM_FB_PRIM_BUF_SIZE (960 * ALIGN(540, 32) * 4 * 2) /* 4 bpp x 2 pages */
+#endif
+
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+#define MSM_FB_EXT_BUF_SIZE  (1920 * 1080 * 2 * 1) /* 2 bpp x 1 page */
+#else
+#define MSM_FB_EXT_BUFT_SIZE	0
+#endif
+
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
+/* width x height x 3 bpp x 2 frame buffer */
+#define MSM_FB_OVERLAY0_WRITEBACK_SIZE roundup((960 * 540 * 3 * 2), 4096)
+#define MSM_FB_WRITEBACK_OFFSET 0
+#else
+#define MSM_FB_OVERLAY0_WRITEBACK_SIZE 0
+#define MSM_FB_WRITEBACK_OFFSET 0
+#endif
+
+#ifdef CONFIG_FB_MSM_OVERLAY1_WRITEBACK
+/* width x height x 3 bpp x 2 frame buffer */
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE roundup((1920 * 1088 * 3 * 2), 4096)
+#define MSM_FB_WRITEBACK_OFFSET 0
+#else
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE 0
+#define MSM_FB_WRITEBACK_OFFSET 0
+#endif
+
 /* externs */
 
 extern int panel_type;
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 extern void sii9234_change_usb_owner(bool bMHL);
 #endif
 

@@ -423,7 +423,7 @@ static unsigned char ruby_shrink_pwm(int val)
 }
 #endif
 
-static struct static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
+static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
 };
 
 static struct platform_device mipi_dsi_cmd_sharp_qhd_panel_device = {
@@ -482,7 +482,7 @@ int mdp_core_clk_rate_table[] = {
 	200000000,
 };
 
-static struct mdp_reg ruby_color_enhancement[] = {
+struct mdp_reg ruby_color_enhancement[] = {
 	{0x93400, 0x0222, 0x0},
 	{0x93404, 0xFFE4, 0x0},
 	{0x93408, 0xFFFD, 0x0},
@@ -507,7 +507,7 @@ static struct mdp_reg ruby_color_enhancement[] = {
 	{0x90070, 0xCD298008, 0x0},
 };
 
-static struct mdp_reg ruy_auo_gamma[] = {
+struct mdp_reg ruy_auo_gamma[] = {
 	{0x94800, 0x000000, 0x0},
 	{0x94804, 0x010201, 0x0},
 	{0x94808, 0x020202, 0x0},
