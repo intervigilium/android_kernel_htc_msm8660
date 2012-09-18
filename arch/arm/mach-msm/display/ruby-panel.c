@@ -29,6 +29,7 @@
 #include <mach/msm_iomap.h>
 #include <mach/panel_id.h>
 #include <mach/msm_bus_board.h>
+#include <mach/msm_memtypes.h>
 #include <linux/mfd/pmic8058.h>
 #include <mach/debug_display.h>
 
@@ -782,14 +783,22 @@ static int ruby_mdp_gamma(void)
 
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = 28,
-	.mdp_core_clk_rate = 200000000,
-	.mdp_core_clk_table = mdp_core_clk_rate_table,
-	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
+	.mdp_max_clk = 200000000,
 #ifdef CONFIG_MSM_BUS_SCALING
 	.mdp_bus_scale_table = &mdp_bus_scale_pdata,
 #endif
+	.mdp_rev = MDP_REV_41,
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	.mem_hid = BIT(ION_CP_WB_HEAP_ID),
+#else
+	.mem_hid = MEMTYPE_EBI1,
+#endif
+	/* HTC additions */
 	.mdp_color_enhance = ruby_mdp_color_enhance,
 	.mdp_gamma = ruby_mdp_gamma,
+#if defined (CONFIG_FB_MSM_MDP_ABL)
+	.abl_gamma_tbl = &gamma_tbl,
+#endif
 };
 
 static void __init msm_fb_add_devices(void)

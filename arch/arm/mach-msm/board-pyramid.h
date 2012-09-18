@@ -44,12 +44,21 @@
 #define MSM_FB_EXT_BUFT_SIZE	0
 #endif
 
-#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 /* width x height x 3 bpp x 2 frame buffer */
-#define MSM_FB_WRITEBACK_SIZE roundup(960 * ALIGN(540, 32) * 3 * 2, 4096)
+#define MSM_FB_OVERLAY0_WRITEBACK_SIZE roundup((960 * 540 * 3 * 2), 4096)
 #define MSM_FB_WRITEBACK_OFFSET 0
 #else
-#define MSM_FB_WRITEBACK_SIZE	0
+#define MSM_FB_OVERLAY0_WRITEBACK_SIZE 0
+#define MSM_FB_WRITEBACK_OFFSET 0
+#endif
+
+#ifdef CONFIG_FB_MSM_OVERLAY1_WRITEBACK
+/* width x height x 3 bpp x 2 frame buffer */
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE roundup((1920 * 1088 * 3 * 2), 4096)
+#define MSM_FB_WRITEBACK_OFFSET 0
+#else
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE 0
 #define MSM_FB_WRITEBACK_OFFSET 0
 #endif
 

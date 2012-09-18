@@ -2643,10 +2643,12 @@ static void __init msm8x60_init_dsps(void)
 #endif
 
 #ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
-/* 1280 x 720 x 3(bpp) x 2(pages) frame buffer */
-#define MSM_FB_WRITEBACK_SIZE	roundup(960 * ALIGN(540, 32) * 3 * 2, 4096)
+/* width x height x 3 bpp x 2 frame buffer */
+#define MSM_FB_WRITEBACK_SIZE roundup(960 * ALIGN(540, 32) * 3 * 2, 4096)
+#define MSM_FB_WRITEBACK_OFFSET 0
 #else
 #define MSM_FB_WRITEBACK_SIZE	0
+#define MSM_FB_WRITEBACK_OFFSET 0
 #endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
