@@ -14,6 +14,9 @@
 #ifdef CONFIG_SPI_QUP
 #include <linux/spi/spi.h>
 #endif
+#ifdef CONFIG_MACH_PYRAMID
+#include <mach/panel_id.h>
+#endif
 #include "msm_fb.h"
 #include "mipi_dsi.h"
 #include "mipi_novatek.h"
@@ -25,6 +28,11 @@ static struct mipi_dsi_panel_platform_data *mipi_novatek_pdata;
 static struct dsi_buf novatek_tx_buf;
 static struct dsi_buf novatek_rx_buf;
 static int mipi_novatek_lcd_init(void);
+
+#ifdef CONFIG_MACH_PYRAMID
+static struct dsi_cmd_desc *mipi_power_on_cmds;
+static int mipi_power_on_cmds_size;
+#endif
 
 #define MIPI_DSI_NOVATEK_SPI_DEVICE_NAME	"dsi_novatek_3d_panel_spi"
 #define HPCI_FPGA_READ_CMD	0x84
@@ -240,9 +248,472 @@ static char set_height[5] = { /* DTYPE_DCS_LWRITE */
 	0x2B, 0x00, 0x00, 0x03, 0xBF}; /* 960 - 1 */
 #endif
 
+static char led_pwm1[2] = {0x51, 0x00}; /* DTYPE_DCS_WRITE1 */
 static char led_pwm2[2] = {0x53, 0x24}; /* DTYPE_DCS_WRITE1 */
 static char led_pwm3[2] = {0x55, 0x00}; /* DTYPE_DCS_WRITE1 */
 
+#ifdef CONFIG_MACH_PYRAMID
+/* HTC Pyramid custom panel code */
+//static char bkl_enable_cmds = {0x53, 0x24}; /* DTYPE_DCS_WRITE1 */
+//static char bkl_disable_cmds = {0x53, 0x00}; /* DTYPE_DCS_WRITE1 */
+static char enable_te[2] = {0x35, 0x00}; /* DTYPE_DCS_WRITE1 */
+static char test_reg[3] = {0x44, 0x02, 0xcf}; /* DTYPE_DCS_LWRITE */
+static char test_reg_ruy_auo[3] = {0x44, 0x01, 0x68}; /* DTYPE_DCS_LWRITE */
+
+static char novatek_pwm_f3[2] = {0xF3, 0xAA}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_00[2] = {0x00, 0x01}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_21[2] = {0x21, 0x20}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_22[2] = {0x22, 0x03}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_7d[2] = {0x7D, 0x01}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_7f[2] = {0x7F, 0xAA}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_cp[2] = {0x09, 0x34}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_cp2[2] = {0xc9, 0x01}; /* DTYPE_DCS_WRITE1 */
+static char novatek_pwm_cp3[2] = {0xff, 0xaa}; /* DTYPE_DCS_WRITE1 */
+
+static char max_pktsize[2] = {0x04, 0x00}; /* LSB tx first, 16 byte */
+
+static struct dsi_cmd_desc novatek_video_on_cmds[] = {
+	{DTYPE_DCS_WRITE, 1, 0, 0, 50,
+		sizeof(sw_reset), sw_reset},
+	{DTYPE_DCS_WRITE, 1, 0, 0, 10,
+		sizeof(exit_sleep), exit_sleep},
+	{DTYPE_DCS_WRITE, 1, 0, 0, 120,
+		sizeof(display_on), display_on},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(enable_te), enable_te},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(set_num_of_lanes), set_num_of_lanes},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(rgb_888), rgb_888},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(led_pwm1), led_pwm1},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(led_pwm2), led_pwm2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(led_pwm3), led_pwm3},
+};
+
+/* Gamma table of PYD, sharp panel */
+static char pyd_sharp_gm[] = {
+	/* into gamma page */
+	0xf3, 0xaa,
+	/* R positive */
+	0x24, 0x00, 0x25, 0x04, 0x26, 0x11, 0x27, 0x1c, 0x28, 0x1a, 0x29, 0x2e,
+	0x2a, 0x5e, 0x2b, 0x21, 0x2d, 0x1f, 0x2f, 0x27, 0x30, 0x60, 0x31, 0x15,
+	0x32, 0x3e, 0x33, 0x5f, 0x34, 0x7c, 0x35, 0x86, 0x36, 0x87, 0x37, 0x08,
+	/* R negative */
+	0x38, 0x01, 0x39, 0x06, 0x3a, 0x14, 0x3b, 0x21, 0x3d, 0x1a, 0x3f, 0x2d,
+	0x40, 0x5f, 0x41, 0x33, 0x42, 0x20, 0x43, 0x27, 0x44, 0x7b, 0x45, 0x15,
+	0x46, 0x3e, 0x47, 0x5f, 0x48, 0xa7, 0x49, 0xb3, 0x4a, 0xb4, 0x4b, 0x35,
+	/* G positive */
+	0x4c, 0x2a, 0x4d, 0x2d, 0x4e, 0x36, 0x4f, 0x3e, 0x50, 0x18, 0x51, 0x2a,
+	0x52, 0x5c, 0x53, 0x2c, 0x54, 0x1d, 0x55, 0x25, 0x56, 0x65, 0x57, 0x12,
+	0x58, 0x3a, 0x59, 0x57, 0x5a, 0x93, 0x5b, 0xb2, 0x5c, 0xb6, 0x5d, 0x37,
+	/* G negative */
+	0x5e, 0x30, 0x5f, 0x34, 0x60, 0x3e, 0x61, 0x46, 0x62, 0x19, 0x63, 0x2b,
+	0x64, 0x5c, 0x65, 0x3f, 0x66, 0x1f, 0x67, 0x26, 0x68, 0x80, 0x69, 0x13,
+	0x6a, 0x3c, 0x6b, 0x57, 0x6c, 0xc0, 0x6d, 0xe2, 0x6e, 0xe7, 0x6f, 0x68,
+	/* B positive */
+	0x70, 0x00, 0x71, 0x0a, 0x72, 0x26, 0x73, 0x37, 0x74, 0x1e, 0x75, 0x32,
+	0x76, 0x60, 0x77, 0x32, 0x78, 0x1f, 0x79, 0x26, 0x7a, 0x68, 0x7b, 0x14,
+	0x7c, 0x39, 0x7d, 0x59, 0x7e, 0x85, 0x7f, 0x86, 0x80, 0x87, 0x81, 0x08,
+	/* B negative */
+	0x82, 0x01, 0x83, 0x0c, 0x84, 0x2b, 0x85, 0x3e, 0x86, 0x1f, 0x87, 0x33,
+	0x88, 0x61, 0x89, 0x45, 0x8a, 0x1f, 0x8b, 0x26, 0x8c, 0x84, 0x8d, 0x14,
+	0x8e, 0x3a, 0x8f, 0x59, 0x90, 0xb1, 0x91, 0xb3, 0x92, 0xb4, 0x93, 0x35,
+	0xc9, 0x01,
+	/* out of gamma page */
+	0xff, 0xaa,
+};
+
+static struct dsi_cmd_desc pyd_sharp_cmd_on_cmds[] = {
+	{DTYPE_DCS_WRITE, 1, 0, 0, 10,
+		sizeof(sw_reset), sw_reset},
+
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 0},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 4},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 6},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 8},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 10},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 12},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 14},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 16},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 18},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 20},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 22},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 24},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 26},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 28},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 30},/* don't change this line */
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 32},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 34},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 36},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 38},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 40},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 42},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 44},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 46},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 48},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 50},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 52},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 54},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 56},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 58},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 60},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 62},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 64},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 66},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 68},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 70},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 72},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 74},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 76},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 78},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 80},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 82},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 84},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 86},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 88},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 90},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 92},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 94},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 96},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 98},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 100},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 102},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 104},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 106},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 108},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 110},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 112},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 114},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 116},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 118},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 120},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 122},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 124},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 126},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 128},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 130},/* don't change this line */
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 132},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 134},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 136},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 138},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 140},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 142},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 144},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 146},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 148},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 150},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 152},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 154},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 156},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 158},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 160},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 162},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 164},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 166},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 168},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 170},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 172},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 174},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 176},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 178},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 180},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 182},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 184},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 186},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 188},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 190},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 192},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 194},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 196},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 198},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 200},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 202},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 204},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 206},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 208},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 210},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 212},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 214},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 216},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 218},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_sharp_gm + 220},
+
+	{DTYPE_DCS_WRITE, 1, 0, 0, 120,
+		sizeof(exit_sleep), exit_sleep},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_f3), novatek_pwm_f3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_00), novatek_pwm_00},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_21), novatek_pwm_21},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_22), novatek_pwm_22},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_7d), novatek_pwm_7d},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_7f), novatek_pwm_7f},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_f3), novatek_pwm_f3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_cp), novatek_pwm_cp},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_cp2), novatek_pwm_cp2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_cp3), novatek_pwm_cp3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(enable_te), enable_te},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(test_reg), test_reg},
+	{DTYPE_MAX_PKTSIZE, 1, 0, 0, 0,
+		sizeof(max_pktsize), max_pktsize},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_f4), novatek_f4},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(novatek_8c), novatek_8c},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_ff), novatek_ff},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(set_num_of_lanes), set_num_of_lanes},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(set_width), set_width},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(set_height), set_height},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(rgb_888), rgb_888},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
+		sizeof(led_pwm2), led_pwm2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
+		sizeof(led_pwm3), led_pwm3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(display_on), display_on},
+};
+
+/* Gamma table of PYD, auo panel */
+static char pyd_auo_gm[] = {
+	/* into gamma page */
+	0xf3, 0xaa,
+	/* R positive */
+	0x24, 0X63, 0X25, 0X6B, 0X26, 0X78, 0X27, 0X7E, 0X28, 0X19, 0X29, 0X2E,
+	0x2A, 0X61, 0X2B, 0X61, 0X2D, 0X1b, 0X2F, 0X22, 0X30, 0X84, 0X31, 0X1B,
+	0x32, 0X4F, 0X33, 0X63, 0X34, 0X28, 0X35, 0XDF, 0X36, 0XC9, 0X37, 0X69,
+	/* R negative */
+	0x38, 0X63, 0X39, 0X6B, 0X3A, 0X78, 0X3B, 0X7E, 0X3D, 0X19, 0X3F, 0X2E,
+	0x40, 0X61, 0X41, 0X61, 0X42, 0X1b, 0X43, 0X22, 0X44, 0X84, 0X45, 0X1B,
+	0x46, 0X4F, 0X47, 0X63, 0X48, 0XC7, 0X49, 0XDF, 0X4A, 0XC9, 0X4B, 0X69,
+	/* G positive */
+	0x4C, 0X45, 0X4D, 0X54, 0X4E, 0X64, 0X4F, 0X75, 0X50, 0X18, 0X51, 0X2E,
+	0x52, 0X62, 0X53, 0X61, 0X54, 0X1D, 0X55, 0X26, 0X56, 0X9D, 0X57, 0X10,
+	0x58, 0X39, 0X59, 0X55, 0X5A, 0XC3, 0X5B, 0XD7, 0X5C, 0XFF, 0X5D, 0X6B,
+	/* G negative */
+	0x5E, 0X45, 0X5F, 0X54, 0X60, 0X64, 0X61, 0X75, 0X62, 0X18, 0X63, 0X2E,
+	0x64, 0X62, 0X65, 0X61, 0X66, 0X1D, 0X67, 0X26, 0X68, 0X65, 0X69, 0X10,
+	0x6A, 0X39, 0X6B, 0X55, 0X6C, 0XC3, 0X6D, 0XD7, 0X6E, 0XFF, 0X6F, 0X6B,
+	/* B positive */
+	0x70, 0X7D, 0X71, 0X82, 0X72, 0X89, 0X73, 0X97, 0X74, 0X19, 0X75, 0X2E,
+	0x76, 0X61, 0X77, 0X6E, 0X78, 0X1A, 0X79, 0X1E, 0X7A, 0X8E, 0X7B, 0X0C,
+	0x7C, 0X27, 0X7D, 0X58, 0X7E, 0XCF, 0X7F, 0XD9, 0X80, 0XFc, 0X81, 0X68,
+	/* B negative */
+	0x82, 0X7D, 0X83, 0X82, 0X84, 0X89, 0X85, 0X97, 0X86, 0X19, 0X87, 0X2E,
+	0x88, 0X61, 0X89, 0X6E, 0X8A, 0X1A, 0X8B, 0X1E, 0X8C, 0X8E, 0X8D, 0X0C,
+	0x8E, 0X27, 0X8F, 0X58, 0X90, 0XCF, 0X91, 0XD9, 0X92, 0XFc, 0X93, 0X68,
+	/* out of gamma page */
+	0xC9, 0x01,
+	0xff, 0xaa,
+};
+
+static struct dsi_cmd_desc pyd_auo_cmd_on_cmds[] = {
+	{DTYPE_DCS_WRITE, 1, 0, 0, 10,
+		sizeof(sw_reset), sw_reset},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, (char[]){0xf3, 0xaa} },
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, (char[]){0xA3, 0xFF} },
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, (char[]){0xA4, 0xFF} },
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, (char[]){0xA5, 0xFF} },
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, (char[]){0xA6, 0x01} },
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, (char[]){0xFF, 0xAA} },
+
+	/* Gamma table start */
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 0},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 4},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 6},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 8},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 10},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 12},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 14},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 16},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 18},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 20},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 22},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 24},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 26},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 28},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 30},/* don't change this line! */
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 32},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 34},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 36},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 38},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 40},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 42},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 44},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 46},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 48},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 50},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 52},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 54},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 56},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 58},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 60},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 62},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 64},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 66},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 68},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 70},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 72},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 74},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 76},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 78},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 80},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 82},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 84},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 86},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 88},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 90},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 92},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 94},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 96},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 98},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 100},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 102},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 104},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 106},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 108},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 110},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 112},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 114},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 116},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 118},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 120},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 122},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 124},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 126},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 128},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 130},/* don't change this line! */
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 132},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 134},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 136},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 138},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 140},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 142},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 144},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 146},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 148},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 150},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 152},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 154},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 156},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 158},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 160},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 162},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 164},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 166},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 168},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 170},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 172},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 174},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 176},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 178},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 180},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 182},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 184},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 186},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 188},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 190},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 192},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 194},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 196},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 198},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 200},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 202},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 204},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 206},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 208},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 210},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 212},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 214},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 216},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 218},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, 2, pyd_auo_gm + 220},
+	/* Gamma table end */
+	{DTYPE_DCS_WRITE, 1, 0, 0, 120,
+		sizeof(exit_sleep), exit_sleep},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_f3), novatek_pwm_f3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_00), novatek_pwm_00},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_21), novatek_pwm_21},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_22), novatek_pwm_22},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_7d), novatek_pwm_7d},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_7f), novatek_pwm_7f},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_f3), novatek_pwm_f3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_cp), novatek_pwm_cp},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_cp2), novatek_pwm_cp2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(novatek_pwm_cp3), novatek_pwm_cp3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(enable_te), enable_te},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(test_reg_ruy_auo), test_reg_ruy_auo},
+	{DTYPE_MAX_PKTSIZE, 1, 0, 0, 0,
+		sizeof(max_pktsize), max_pktsize},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(set_width), set_width},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(set_height), set_height},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(rgb_888), rgb_888},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
+		sizeof(led_pwm2), led_pwm2},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
+		sizeof(led_pwm3), led_pwm3},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
+		sizeof(display_on), display_on},
+};
+
+static struct dsi_cmd_desc novatek_display_off_cmds[] = {
+	{DTYPE_DCS_WRITE, 1, 0, 0, 10,
+		sizeof(display_off), display_off},
+	{DTYPE_DCS_WRITE, 1, 0, 0, 110,
+		sizeof(enter_sleep), enter_sleep}
+};
+
+static void mipi_novatek_panel_type_detect(void)
+{
+	switch (panel_type) {
+		case PANEL_ID_PYD_SHARP:
+			mipi_power_on_cmds = pyd_sharp_cmd_on_cmds;
+			mipi_power_on_cmds_size = ARRAY_SIZE(pyd_sharp_cmd_on_cmds);
+			break;
+		case PANEL_ID_PYD_AUO_NT:
+			mipi_power_on_cmds = pyd_auo_cmd_on_cmds;
+			mipi_power_on_cmds_size = ARRAY_SIZE(pyd_auo_cmd_on_cmds);
+			break;
+		default:
+			pr_err("%s: panel_type=0x%x not supported\n",
+					__func__, panel_type);
+	}
+}
+#else
 static struct dsi_cmd_desc novatek_video_on_cmds[] = {
 	{DTYPE_DCS_WRITE, 1, 0, 0, 50,
 		sizeof(sw_reset), sw_reset},
@@ -293,6 +764,7 @@ static struct dsi_cmd_desc novatek_display_off_cmds[] = {
 	{DTYPE_DCS_WRITE, 1, 0, 0, 120,
 		sizeof(enter_sleep), enter_sleep}
 };
+#endif
 
 static char manufacture_id[2] = {0x04, 0x00}; /* DTYPE_DCS_READ */
 
@@ -394,8 +866,13 @@ static int mipi_novatek_lcd_on(struct platform_device *pdev)
 		mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_video_on_cmds,
 				ARRAY_SIZE(novatek_video_on_cmds));
 	} else {
+#ifdef CONFIG_MACH_PYRAMID
+		mipi_dsi_cmds_tx(&novatek_tx_buf, mipi_power_on_cmds,
+				mipi_power_on_cmds_size);
+#else
 		mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_cmd_on_cmds,
 				ARRAY_SIZE(novatek_cmd_on_cmds));
+#endif
 
 		/* clean up ack_err_status */
 		mipi_dsi_cmd_bta_sw_trigger();
@@ -422,7 +899,6 @@ static int mipi_novatek_lcd_off(struct platform_device *pdev)
 	return 0;
 }
 
-static char led_pwm1[2] = {0x51, 0x0};	/* DTYPE_DCS_WRITE1 */
 static struct dsi_cmd_desc backlight_cmd = {
 	DTYPE_DCS_LWRITE, 1, 0, 0, 1, sizeof(led_pwm1), led_pwm1};
 
@@ -626,6 +1102,10 @@ static int mipi_novatek_lcd_init(void)
 		platform_driver_unregister(&this_driver);
 	} else
 		pr_info("%s: SUCCESS (SPI)\n", __func__);
+#endif
+
+#ifdef CONFIG_MACH_PYRAMID
+	mipi_novatek_panel_type_detect();
 #endif
 
 	mipi_dsi_buf_alloc(&novatek_tx_buf, DSI_BUF_SIZE);
