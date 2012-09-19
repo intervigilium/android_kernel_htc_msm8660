@@ -14,7 +14,7 @@
 #ifdef CONFIG_SPI_QUP
 #include <linux/spi/spi.h>
 #endif
-#ifdef CONFIG_MACH_PYRAMID
+#ifdef CONFIG_MACH_RUBY
 #include <mach/panel_id.h>
 #endif
 #include "msm_fb.h"
@@ -29,7 +29,7 @@ static struct dsi_buf novatek_tx_buf;
 static struct dsi_buf novatek_rx_buf;
 static int mipi_novatek_lcd_init(void);
 
-#ifdef CONFIG_MACH_PYRAMID
+#ifdef CONFIG_MACH_RUBY
 static struct dsi_cmd_desc *mipi_power_on_cmds;
 static int mipi_power_on_cmds_size;
 #endif
@@ -252,7 +252,7 @@ static char led_pwm1[2] = {0x51, 0x00}; /* DTYPE_DCS_WRITE1 */
 static char led_pwm2[2] = {0x53, 0x24}; /* DTYPE_DCS_WRITE1 */
 static char led_pwm3[2] = {0x55, 0x00}; /* DTYPE_DCS_WRITE1 */
 
-#ifdef CONFIG_MACH_PYRAMID
+#ifdef CONFIG_MACH_RUBY
 /* HTC Pyramid custom panel code */
 //static char bkl_enable_cmds = {0x53, 0x24}; /* DTYPE_DCS_WRITE1 */
 //static char bkl_disable_cmds = {0x53, 0x00}; /* DTYPE_DCS_WRITE1 */
@@ -866,7 +866,7 @@ static int mipi_novatek_lcd_on(struct platform_device *pdev)
 		mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_video_on_cmds,
 				ARRAY_SIZE(novatek_video_on_cmds));
 	} else {
-#ifdef CONFIG_MACH_PYRAMID
+#ifdef CONFIG_MACH_RUBY
 		mipi_dsi_cmds_tx(&novatek_tx_buf, mipi_power_on_cmds,
 				mipi_power_on_cmds_size);
 #else
@@ -1104,7 +1104,7 @@ static int mipi_novatek_lcd_init(void)
 		pr_info("%s: SUCCESS (SPI)\n", __func__);
 #endif
 
-#ifdef CONFIG_MACH_PYRAMID
+#ifdef CONFIG_MACH_RUBY
 	mipi_novatek_panel_type_detect();
 #endif
 
