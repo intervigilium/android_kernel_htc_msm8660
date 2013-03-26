@@ -1244,10 +1244,9 @@ CONFIG_WLAN=y
 # CONFIG_LIBRA_SDIOIF is not set
 # CONFIG_ATH_COMMON is not set
 # CONFIG_BCM4329 is not set
-# CONFIG_BCMDHD is not set
-CONFIG_BCMDHD_DS=m
-CONFIG_BCMDHD_DS_FW_PATH="/vendor/firmware/fw_bcmdhd.bin"
-CONFIG_BCMDHD_DS_NVRAM_PATH="/proc/calibration"
+CONFIG_BCMDHD=m
+CONFIG_BCMDHD_FW_PATH="/vendor/firmware/fw_bcmdhd.bin"
+CONFIG_BCMDHD_NVRAM_PATH="/proc/calibration"
 # CONFIG_HOSTAP is not set
 # CONFIG_IWM is not set
 # CONFIG_LIBERTAS is not set
@@ -1744,12 +1743,9 @@ CONFIG_THERMAL_PM8901=y
 # CONFIG_THERMAL_MSM_POPMEM is not set
 # CONFIG_THERMAL_TSENS is not set
 # CONFIG_THERMAL_TSENS8960 is not set
-CONFIG_THERMAL_TSENS8x60=y
 # CONFIG_THERMAL_PM8XXX is not set
-CONFIG_THERMAL_MONITOR=y
 # CONFIG_WATCHDOG is not set
 CONFIG_SSB_POSSIBLE=y
-
 
 #
 # Sonics Silicon Backplane
